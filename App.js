@@ -186,10 +186,10 @@ export default function App() {
             <Text style={styles.phaseTitle}>1. Mod Igre</Text>
             <View style={styles.modeContainer}>
               <TouchableOpacity style={[styles.modeButton, gameMode === 'sentences' && styles.activeMode]} onPress={() => setGameMode('sentences')}>
-                <Text style={styles.buttonText}>📝 Rečenice</Text>
+                <Text style={styles.buttonText}>Rečenice</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modeButton, gameMode === 'words' && styles.activeMode]} onPress={() => setGameMode('words')}>
-                <Text style={styles.buttonText}>🔑 Reči</Text>
+                <Text style={styles.buttonText}>Reči</Text>
               </TouchableOpacity>
             </View>
 
@@ -220,10 +220,10 @@ export default function App() {
             <Text style={styles.labelNormal}>IZABRANO:</Text>
             <Text style={styles.textNormal}>{gameMode === 'sentences' ? selectedData?.normal : selectedData?.word}</Text>
             <TouchableOpacity style={styles.buttonSecondary} onPress={pickRandomData}>
-              <Text style={styles.buttonText}>🔄 Drugo nasumično</Text>
+              <Text style={styles.buttonText}>Drugo pitanje</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.buttonSuccess} onPress={() => {setAnswers([]); setCurrentPlayerIndex(0); setPhase('pass');}}>
-              <Text style={styles.buttonText}>Kreni ▶</Text>
+              <Text style={styles.buttonText}>Start</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -256,8 +256,7 @@ export default function App() {
               <View style={styles.center}>
                 <Pressable onPressIn={() => handleFlip(1)} onPressOut={() => handleFlip(0)} style={styles.cardBox}>
                   <Animated.View style={[styles.flipCard, styles.flipFront, { transform: [{ rotateY: flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }]}>
-                    <Text style={{fontSize: 50}}>👆</Text>
-                    <Text style={{color: '#fff', marginTop: 10}}>Drži da vidiš</Text>
+                    <Text style={{fontSize: 30,color: '#fff'}}>Drži da vidiš</Text>
                   </Animated.View>
                   <Animated.View style={[styles.flipCard, styles.flipBack, { transform: [{ rotateY: flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] }) }] }]}>
                     <Text style={{fontSize: 50,color: '#ff0000'}}>{currentPlayerIndex === impostorIndex ? "HINT:" : "REČ:"}</Text>
