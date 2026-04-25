@@ -260,7 +260,7 @@ export default function App() {
                     <Text style={{color: '#fff', marginTop: 10}}>Drži da vidiš</Text>
                   </Animated.View>
                   <Animated.View style={[styles.flipCard, styles.flipBack, { transform: [{ rotateY: flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] }) }] }]}>
-                    <Text style={styles.labelNormal}>{currentPlayerIndex === impostorIndex ? "HINT:" : "REČ:"}</Text>
+                    <Text style={{fontSize: 50,color: '#ff0000'}}>{currentPlayerIndex === impostorIndex ? "HINT:" : "REČ:"}</Text>
                     <Text style={styles.textNormal}>{currentPlayerIndex === impostorIndex ? selectedData?.hint : selectedData?.word}</Text>
                   </Animated.View>
                 </Pressable>
