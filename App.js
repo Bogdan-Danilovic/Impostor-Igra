@@ -273,7 +273,7 @@ export default function App() {
         {/* REZULTATI I OTKRIVANJE */}
         {phase === 'discussion' && (
           <View>
-            <Text style={styles.phaseTitle}>Rasprava!</Text>
+            <Text style={styles.textNormal}>{gameMode === 'sentences' ? selectedData?.normal : selectedData?.word}</Text>
             {gameMode === 'sentences' && answers.map((a, i) => (
               <View key={i} style={styles.ansBox}><Text style={styles.ansName}>{a.name}:</Text><Text style={{color: '#fff'}}>"{a.text}"</Text></View>
             ))}
