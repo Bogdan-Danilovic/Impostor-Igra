@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -6,7 +6,9 @@ import {
   TextInput, 
   TouchableOpacity, 
   ScrollView, 
-  Alert 
+  Alert,
+  Animated,
+  Pressable 
 } from 'react-native';
 
 // Baza pitanja (Rečenice)
@@ -82,22 +84,28 @@ const WORD_DATABASE = [
 ];
 
 export default function App() {
-  // Sva stanja igre
   const [questions, setQuestions] = useState(INITIAL_QUESTIONS);
   const [words, setWords] = useState(WORD_DATABASE);
-  const [gameMode, setGameMode] = useState('sentences'); // 'sentences' ili 'words'
+  const [gameMode, setGameMode] = useState('sentences');
   const [players, setPlayers] = useState(["", "", "", ""]);
   const [answers, setAnswers] = useState([]);
   const [phase, setPhase] = useState('setup'); 
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [impostorIndex, setImpostorIndex] = useState(null);
-  const [selectedData, setSelectedData] = useState(null); // Čuva ili par pitanja ili par reč-hint
+  const [selectedData, setSelectedData] = useState(null);
   const [currentAnswer, setCurrentAnswer] = useState("");
 
-  // Stanja za nove unose
+  // Stanja za nove unose (Dodaj pitanje/reč)
   const [newNormal, setNewNormal] = useState("");
   const [newImpostor, setNewImpostor] = useState("");
 
+  // Animacija kartice
+  const flipAnim = useRef(new Animated.Value(0)).current;
+  const handleFlip = (toValue) => {
+    Animated.spring(flipAnim, { toValue, friction: 8, useNativeDriver: true }).start();
+  };
+
+  // Funkcije za igrače
   const handleNameChange = (index, value) => {
     const newPlayers = [...players];
     newPlayers[index] = value;
@@ -106,7 +114,7 @@ export default function App() {
 
   const addPlayerField = () => {
     if (players.length < 12) setPlayers([...players, ""]);
-    else Alert.alert("Maksimum", "Maksimalan broj igrača je 12.");
+    else Alert.alert("Maksimum", "Maksimalno 12 igrača.");
   };
 
   const removePlayerField = () => {
@@ -114,9 +122,10 @@ export default function App() {
       const newPlayers = [...players];
       newPlayers.pop();
       setPlayers(newPlayers);
-    } else Alert.alert("Minimum", "Moraju biti bar 3 igrača.");
+    } else Alert.alert("Minimum", "Minimalno 3 igrača.");
   };
 
+  // Dodavanje u bazu
   const addNewEntry = () => {
     if (newNormal.trim() === "" || newImpostor.trim() === "") {
       Alert.alert("Greška", "Popunite oba polja!");
@@ -127,24 +136,20 @@ export default function App() {
     } else {
       setWords([...words, { word: newNormal, hint: newImpostor }]);
     }
-    setNewNormal("");
-    setNewImpostor("");
-    Alert.alert("Uspešno!", "Dodato u tvoju bazu.");
+    setNewNormal(""); setNewImpostor("");
+    Alert.alert("Uspešno", "Dodato u bazu!");
   };
 
+  // Funkcija za zamenu pitanja (nasumično)
   const pickRandomData = () => {
-    if (gameMode === 'sentences') {
-      const randomIndex = Math.floor(Math.random() * questions.length);
-      setSelectedData(questions[randomIndex]);
-    } else {
-      const randomIndex = Math.floor(Math.random() * words.length);
-      setSelectedData(words[randomIndex]);
-    }
+    const data = gameMode === 'sentences' ? questions : words;
+    const randomIndex = Math.floor(Math.random() * data.length);
+    setSelectedData(data[randomIndex]);
   };
 
   const startGame = () => {
     if (players.some(name => name.trim() === "")) {
-      Alert.alert("Pažnja", "Molim vas, popunite sva imena igrača.");
+      Alert.alert("Pažnja", "Popunite imena svih igrača.");
       return;
     }
     pickRandomData();
@@ -152,20 +157,16 @@ export default function App() {
     setPhase('preview');
   };
 
-  const confirmAndPlay = () => {
-    setAnswers([]);
-    setCurrentPlayerIndex(0);
-    setPhase('pass');
-  };
-
   const submitAnswer = () => {
-    if (currentAnswer.trim() === "") {
-      Alert.alert("Greška", "Moraš nešto napisati!");
-      return;
+    if (gameMode === 'sentences') {
+      if (currentAnswer.trim() === "") {
+        Alert.alert("Greška", "Unesi odgovor!");
+        return;
+      }
+      setAnswers([...answers, { name: players[currentPlayerIndex], text: currentAnswer }]);
     }
-    setAnswers([...answers, { name: players[currentPlayerIndex], text: currentAnswer }]);
+    
     setCurrentAnswer("");
-
     if (currentPlayerIndex < players.length - 1) {
       setCurrentPlayerIndex(currentPlayerIndex + 1);
       setPhase('pass');
@@ -174,250 +175,155 @@ export default function App() {
     }
   };
 
-  const resetGame = () => {
-    setPhase('setup');
-    setAnswers([]);
-    setCurrentAnswer("");
-  };
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.mainTitle}>Ko je Impostor?</Text>
-        <Text style={styles.subtitle}>
-          Mod: {gameMode === 'sentences' ? 'Rečenice' : 'Reči i Hintovi'}
-        </Text>
-      </View>
+      <Text style={styles.mainTitle}>Ko je Impostor?</Text>
 
       <View style={styles.card}>
-        
-        {/* FAZA 1: SETUP */}
+        {/* SETUP FAZA */}
         {phase === 'setup' && (
           <View>
-            <Text style={styles.phaseTitle}>1. Izaberi mod igre</Text>
+            <Text style={styles.phaseTitle}>1. Mod Igre</Text>
             <View style={styles.modeContainer}>
-              <TouchableOpacity 
-                style={[styles.modeButton, gameMode === 'sentences' && styles.modeButtonActive]} 
-                onPress={() => setGameMode('sentences')}
-              >
+              <TouchableOpacity style={[styles.modeButton, gameMode === 'sentences' && styles.activeMode]} onPress={() => setGameMode('sentences')}>
                 <Text style={styles.buttonText}>📝 Rečenice</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modeButton, gameMode === 'words' && styles.modeButtonActive]} 
-                onPress={() => setGameMode('words')}
-              >
+              <TouchableOpacity style={[styles.modeButton, gameMode === 'words' && styles.activeMode]} onPress={() => setGameMode('words')}>
                 <Text style={styles.buttonText}>🔑 Reči</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.phaseTitle, { marginTop: 20 }]}>2. Unesite igrače</Text>
             <View style={styles.playerControlRow}>
-              <TouchableOpacity style={styles.controlButtonSmall} onPress={removePlayerField}>
-                <Text style={styles.buttonText}>-</Text>
-              </TouchableOpacity>
-              <Text style={styles.playerCountText}>{players.length} igrača</Text>
-              <TouchableOpacity style={styles.controlButtonSmall} onPress={addPlayerField}>
-                <Text style={styles.buttonText}>+</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.roundBtn} onPress={removePlayerField}><Text style={styles.buttonText}>-</Text></TouchableOpacity>
+              <Text style={styles.playerCount}>{players.length} Igrača</Text>
+              <TouchableOpacity style={styles.roundBtn} onPress={addPlayerField}><Text style={styles.buttonText}>+</Text></TouchableOpacity>
             </View>
 
-            {players.map((player, idx) => (
-              <TextInput
-                key={idx}
-                style={styles.input}
-                placeholder={`Igrač ${idx + 1}`}
-                placeholderTextColor="#94a3b8"
-                value={player}
-                onChangeText={(text) => handleNameChange(idx, text)}
-              />
+            {players.map((p, i) => (
+              <TextInput key={i} style={styles.input} placeholder={`Igrač ${i+1}`} value={p} onChangeText={t => handleNameChange(i, t)} placeholderTextColor="#94a3b8" />
             ))}
             
-            <TouchableOpacity style={styles.buttonPrimary} onPress={startGame}>
-              <Text style={styles.buttonText}>Započni igru</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.buttonPrimary} onPress={startGame}><Text style={styles.buttonText}>Započni</Text></TouchableOpacity>
 
-            <View style={styles.dividerBox} />
-
-            <Text style={styles.phaseTitle}>3. Dodaj svoj sadržaj (Opciono)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={gameMode === 'sentences' ? "Normalno pitanje..." : "Reč (npr. Pizza)"}
-              placeholderTextColor="#94a3b8"
-              value={newNormal}
-              onChangeText={setNewNormal}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder={gameMode === 'sentences' ? "Impostor pitanje..." : "Hint (npr. Sir)"}
-              placeholderTextColor="#94a3b8"
-              value={newImpostor}
-              onChangeText={setNewImpostor}
-            />
-            <TouchableOpacity style={styles.buttonSecondary} onPress={addNewEntry}>
-              <Text style={styles.buttonText}>+ Dodaj u bazu</Text>
-            </TouchableOpacity>
+            <View style={styles.divider} />
+            
+            <Text style={styles.phaseTitle}>Dodaj svoje</Text>
+            <TextInput style={styles.input} placeholder="Normalno / Reč" value={newNormal} onChangeText={setNewNormal} placeholderTextColor="#94a3b8" />
+            <TextInput style={styles.input} placeholder="Impostor / Hint" value={newImpostor} onChangeText={setNewImpostor} placeholderTextColor="#94a3b8" />
+            <TouchableOpacity style={styles.buttonSecondary} onPress={addNewEntry}><Text style={styles.buttonText}>+ Dodaj u bazu</Text></TouchableOpacity>
           </View>
         )}
 
-        {/* FAZA 1.5: HOST PREVIEW */}
+        {/* PREVIEW SA ZAMENOM PITANJA */}
         {phase === 'preview' && (
-          <View>
-            <Text style={[styles.phaseTitle, { color: '#fbbf24' }]}>Izabran zadatak:</Text>
-            <Text style={styles.subtitle}>Samo host gleda! Proveri da li ti se sviđa izbor.</Text>
-            
-            <View style={styles.revealInfoBox}>
-              <Text style={styles.labelNormal}>{gameMode === 'sentences' ? "Normalno:" : "Reč:"}</Text>
-              <Text style={styles.textNormal}>{gameMode === 'sentences' ? selectedData?.normal : selectedData?.word}</Text>
-              {gameMode === 'words' && (
-                <>
-                </>
-              )}
-            </View>
-
-            <TouchableOpacity style={[styles.buttonPrimary, { backgroundColor: '#f59e0b', marginTop: 20 }]} onPress={pickRandomData}>
+          <View style={styles.center}>
+            <Text style={styles.labelNormal}>IZABRANO:</Text>
+            <Text style={styles.textNormal}>{gameMode === 'sentences' ? selectedData?.normal : selectedData?.word}</Text>
+            <TouchableOpacity style={styles.buttonSecondary} onPress={pickRandomData}>
               <Text style={styles.buttonText}>🔄 Drugo nasumično</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.buttonSuccess, { marginTop: 10 }]} onPress={confirmAndPlay}>
+            <TouchableOpacity style={styles.buttonSuccess} onPress={() => {setAnswers([]); setCurrentPlayerIndex(0); setPhase('pass');}}>
               <Text style={styles.buttonText}>Kreni ▶</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* FAZA 2: PASS DEVICE */}
+        {/* PASS DEVICE */}
         {phase === 'pass' && (
-          <View style={styles.centerContent}>
-            <Text style={styles.emoji}>🤫</Text>
-            <Text style={styles.passText}>Dodaj mobitel igraču:</Text>
+          <View style={styles.center}>
+            <Text style={styles.passText}>Dodaj mobitel:</Text>
             <Text style={styles.playerNameHighlight}>{players[currentPlayerIndex]}</Text>
-            <Text style={styles.passSubtext}>Budi diskretan!</Text>
             <TouchableOpacity style={styles.buttonPrimary} onPress={() => setPhase('answer')}>
               <Text style={styles.buttonText}>Spreman sam</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* FAZA 3: ANSWER */}
+        {/* ODGOVARANJE (SA ANIMACIJOM KARTICE ZA REČI) */}
         {phase === 'answer' && (
-          <View>
-            <Text style={styles.phaseTitle}>Za: {players[currentPlayerIndex]}</Text>
-            <View style={styles.questionBox}>
-              <Text style={styles.questionText}>
-                {gameMode === 'sentences' 
-                  ? (currentPlayerIndex === impostorIndex ? selectedData?.impostor : selectedData?.normal)
-                  : (currentPlayerIndex === impostorIndex ? `TVOJA REČ JE (HINT): ${selectedData?.hint}` : `TVOJA REČ JE: ${selectedData?.word}`)
-                }
-              </Text>
-            </View>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Odgovori diskretno..."
-              placeholderTextColor="#94a3b8"
-              value={currentAnswer}
-              onChangeText={setCurrentAnswer}
-              multiline={true}
-            />
-            <TouchableOpacity style={styles.buttonSuccess} onPress={submitAnswer}>
-              <Text style={styles.buttonText}>Spremi i sakrij</Text>
-            </TouchableOpacity>
+          <View style={styles.center}>
+            <Text style={styles.phaseTitle}>Igrač: {players[currentPlayerIndex]}</Text>
+            
+            {gameMode === 'sentences' ? (
+              <View style={{width: '100%'}}>
+                <View style={styles.questionBox}>
+                  <Text style={styles.questionText}>{currentPlayerIndex === impostorIndex ? selectedData?.impostor : selectedData?.normal}</Text>
+                </View>
+                <TextInput style={styles.textArea} value={currentAnswer} onChangeText={setCurrentAnswer} multiline placeholder="Tvoj odgovor..." placeholderTextColor="#94a3b8" />
+                <TouchableOpacity style={styles.buttonSuccess} onPress={submitAnswer}><Text style={styles.buttonText}>Spremi</Text></TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.center}>
+                <Pressable onPressIn={() => handleFlip(1)} onPressOut={() => handleFlip(0)} style={styles.cardBox}>
+                  <Animated.View style={[styles.flipCard, styles.flipFront, { transform: [{ rotateY: flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }]}>
+                    <Text style={{fontSize: 50}}>👆</Text>
+                    <Text style={{color: '#fff', marginTop: 10}}>Drži da vidiš</Text>
+                  </Animated.View>
+                  <Animated.View style={[styles.flipCard, styles.flipBack, { transform: [{ rotateY: flipAnim.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] }) }] }]}>
+                    <Text style={styles.labelNormal}>{currentPlayerIndex === impostorIndex ? "HINT:" : "REČ:"}</Text>
+                    <Text style={styles.textNormal}>{currentPlayerIndex === impostorIndex ? selectedData?.hint : selectedData?.word}</Text>
+                  </Animated.View>
+                </Pressable>
+                <TouchableOpacity style={styles.buttonSuccess} onPress={submitAnswer}><Text style={styles.buttonText}>Video sam, sledeći</Text></TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
 
-        {/* FAZA 4: DISCUSSION */}
+        {/* REZULTATI I OTKRIVANJE */}
         {phase === 'discussion' && (
           <View>
-            <Text style={[styles.phaseTitle, { color: '#fbbf24' }]}>Vreme je za detektivski rad!</Text>
-            <Text style={styles.subtitle}>Pročitajte odgovore i otkrijte uljeza.</Text>
-            
-            {answers.map((ans, idx) => (
-              <View key={idx} style={styles.answerBox}>
-                <Text style={styles.answerName}>{ans.name}:</Text>
-                <Text style={styles.answerText}>"{ans.text}"</Text>
-              </View>
+            <Text style={styles.phaseTitle}>Rasprava!</Text>
+            {gameMode === 'sentences' && answers.map((a, i) => (
+              <View key={i} style={styles.ansBox}><Text style={styles.ansName}>{a.name}:</Text><Text style={{color: '#fff'}}>"{a.text}"</Text></View>
             ))}
-
-            <TouchableOpacity style={[styles.buttonPrimary, { backgroundColor: '#dc2626', marginTop: 20 }]} onPress={() => setPhase('reveal')}>
-              <Text style={styles.buttonText}>Otkrij Impostora</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={[styles.buttonPrimary, {backgroundColor: '#dc2626'}]} onPress={() => setPhase('reveal')}><Text style={styles.buttonText}>Otkrij Impostora</Text></TouchableOpacity>
           </View>
         )}
 
-        {/* FAZA 5: REVEAL */}
         {phase === 'reveal' && (
-          <View style={styles.centerContent}>
-            <Text style={styles.revealTitle}>IMPOSTOR JE BIO...</Text>
-            <View style={styles.impostorBox}>
-              <Text style={styles.impostorName}>{players[impostorIndex]}</Text>
-            </View>
-
-            <View style={styles.revealInfoBox}>
-              {gameMode === 'sentences' ? (
-                <>
-                  <Text style={styles.labelNormal}>Normalno pitanje:</Text>
-                  <Text style={styles.textNormal}>{selectedData?.normal}</Text>
-                  <View style={styles.divider} />
-                  <Text style={styles.labelImpostor}>Impostorovo pitanje:</Text>
-                  <Text style={styles.textImpostor}>{selectedData?.impostor}</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.labelNormal}>Glavna reč:</Text>
-                  <Text style={styles.textNormal}>{selectedData?.word}</Text>
-                  <View style={styles.divider} />
-                  <Text style={styles.labelImpostor}>Hint koji je Impostor video:</Text>
-                  <Text style={styles.textImpostor}>{selectedData?.hint}</Text>
-                </>
-              )}
-            </View>
-
-            <TouchableOpacity style={[styles.buttonPrimary, { backgroundColor: '#475569', marginTop: 20 }]} onPress={resetGame}>
-              <Text style={styles.buttonText}>Igraj ponovo</Text>
-            </TouchableOpacity>
+          <View style={styles.center}>
+            <Text style={styles.labelImpostor}>IMPOSTOR JE BIO:</Text>
+            <Text style={styles.playerNameHighlight}>{players[impostorIndex]}</Text>
+            <TouchableOpacity style={styles.buttonPrimary} onPress={() => setPhase('setup')}><Text style={styles.buttonText}>Igraj ponovo</Text></TouchableOpacity>
           </View>
         )}
-
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: '#0f172a', alignItems: 'center', paddingVertical: 40, paddingHorizontal: 15 },
-  header: { alignItems: 'center', marginBottom: 20 },
-  mainTitle: { fontSize: 32, fontWeight: 'bold', color: '#f97316', textAlign: 'center' },
-  subtitle: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 5, marginBottom: 10 },
-  card: { backgroundColor: '#1e293b', width: '100%', maxWidth: 400, borderRadius: 15, padding: 20, elevation: 5 },
-  phaseTitle: { fontSize: 18, fontWeight: 'bold', color: '#a5b4fc', textAlign: 'center', marginBottom: 10 },
-  modeContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 10 },
-  modeButton: { padding: 12, borderRadius: 8, backgroundColor: '#334155', borderWidth: 1, borderColor: '#475569', flex: 0.45, alignItems: 'center' },
-  modeButtonActive: { backgroundColor: '#6366f1', borderColor: '#818cf8' },
-  playerControlRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, backgroundColor: '#334155', padding: 10, borderRadius: 8 },
-  playerCountText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  controlButtonSmall: { backgroundColor: '#475569', width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  input: { backgroundColor: '#334155', color: '#fff', borderRadius: 8, padding: 12, marginBottom: 10, fontSize: 16 },
+  container: { flexGrow: 1, backgroundColor: '#0f172a', padding: 20, alignItems: 'center' },
+  mainTitle: { fontSize: 32, fontWeight: 'bold', color: '#f97316', marginVertical: 20 },
+  card: { backgroundColor: '#1e293b', width: '100%', maxWidth: 400, borderRadius: 15, padding: 20 },
+  phaseTitle: { fontSize: 18, color: '#a5b4fc', textAlign: 'center', marginBottom: 15, fontWeight: 'bold' },
+  modeContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  modeButton: { flex: 0.48, padding: 12, backgroundColor: '#334155', borderRadius: 8, alignItems: 'center' },
+  activeMode: { backgroundColor: '#6366f1' },
+  playerControlRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
+  roundBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#475569', justifyContent: 'center', alignItems: 'center', marginHorizontal: 20 },
+  playerCount: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  input: { backgroundColor: '#334155', color: '#fff', borderRadius: 8, padding: 12, marginBottom: 10 },
   buttonPrimary: { backgroundColor: '#6366f1', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
-  buttonSecondary: { backgroundColor: '#8b5cf6', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 5 },
-  buttonSuccess: { backgroundColor: '#16a34a', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 15 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-  dividerBox: { height: 1, backgroundColor: '#334155', marginVertical: 20 },
-  centerContent: { alignItems: 'center', paddingVertical: 10 },
-  emoji: { fontSize: 50, marginBottom: 10 },
-  passText: { fontSize: 20, color: '#fff', fontWeight: 'bold', textAlign: 'center' },
-  playerNameHighlight: { fontSize: 26, color: '#818cf8', fontWeight: 'bold', marginVertical: 10, textAlign: 'center' },
-  passSubtext: { color: '#94a3b8', fontSize: 14, marginBottom: 20, textAlign: 'center' },
+  buttonSecondary: { backgroundColor: '#475569', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
+  buttonSuccess: { backgroundColor: '#16a34a', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 15, width: '100%' },
+  buttonText: { color: '#fff', fontWeight: 'bold' },
+  divider: { height: 1, backgroundColor: '#334155', marginVertical: 20 },
+  center: { alignItems: 'center', width: '100%' },
+  labelNormal: { color: '#94a3b8', fontSize: 12 },
+  textNormal: { color: '#fff', fontSize: 24, fontWeight: 'bold', marginBottom: 15 },
+  passText: { color: '#fff', fontSize: 20 },
+  playerNameHighlight: { color: '#818cf8', fontSize: 32, fontWeight: 'bold', marginVertical: 15 },
   questionBox: { backgroundColor: '#334155', padding: 20, borderRadius: 10, marginBottom: 15 },
-  questionText: { fontSize: 18, color: '#fff', textAlign: 'center', fontWeight: 'bold' },
-  textArea: { backgroundColor: '#0f172a', color: '#fff', borderRadius: 8, padding: 15, fontSize: 16, height: 100, textAlignVertical: 'top' },
-  answerBox: { backgroundColor: '#334155', padding: 12, borderRadius: 8, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: '#6366f1' },
-  answerName: { color: '#a5b4fc', fontWeight: 'bold', fontSize: 14, marginBottom: 2 },
-  answerText: { color: '#fff', fontSize: 15, fontStyle: 'italic' },
-  revealTitle: { fontSize: 24, fontWeight: 'bold', color: '#ef4444', marginBottom: 10 },
-  impostorBox: { backgroundColor: 'rgba(127, 29, 29, 0.4)', borderColor: '#ef4444', borderWidth: 1, padding: 15, borderRadius: 10, width: '100%', alignItems: 'center', marginBottom: 15 },
-  impostorName: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
-  revealInfoBox: { backgroundColor: '#334155', padding: 15, borderRadius: 10, width: '100%' },
-  labelNormal: { color: '#94a3b8', fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
-  textNormal: { color: '#fff', fontSize: 16, marginTop: 5, marginBottom: 10 },
-  divider: { height: 1, backgroundColor: '#475569', marginVertical: 10 },
-  labelImpostor: { color: '#f87171', fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
-  textImpostor: { color: '#fecaca', fontSize: 16, marginTop: 5 }
+  questionText: { color: '#fff', fontSize: 18, textAlign: 'center' },
+  textArea: { backgroundColor: '#0f172a', color: '#fff', borderRadius: 8, padding: 15, height: 80 },
+  ansBox: { backgroundColor: '#334155', padding: 10, borderRadius: 8, marginBottom: 5, borderLeftWidth: 4, borderLeftColor: '#6366f1' },
+  ansName: { color: '#a5b4fc', fontWeight: 'bold' },
+  labelImpostor: { color: '#ef4444', fontWeight: 'bold' },
+  // STILOVI ZA KARTICU
+  cardBox: { width: 220, height: 280, marginVertical: 20 },
+  flipCard: { width: '100%', height: '100%', position: 'absolute', backfaceVisibility: 'hidden', borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  flipFront: { backgroundColor: '#3b82f6' },
+  flipBack: { backgroundColor: '#0f172a', transform: [{ rotateY: '180deg' }], borderWidth: 2, borderColor: '#334155' }
 });
